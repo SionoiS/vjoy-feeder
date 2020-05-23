@@ -1,14 +1,27 @@
 use hidapi::{HidApi, HidDevice, HidError, HidResult};
+
 use rusty_vjoy::{HidUsage, JoystickPosition, VJDStat};
+
+use std::io;
+use std::io::prelude::*;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 const HALFMAXI16: i32 = i16::MAX as i32 / 2;
 
-const REPORT_TRANSLATION: u8 = 1;
-const REPORT_ROTATION: u8 = 2;
-const REPORT_BUTTONS: u8 = 3;
-const _REPORT_LED: u8 = 4;
+//SpaceNavigator
+const VENDOR_ID: u16 = 1133;
+const PRODUCT_ID: u16 = 50726;
+
+//16 bit signed per axis
+const REPORT_TRANSLATION: u8 = 1; //left/right, foward/back, up/down
+const REPORT_ROTATION: u8 = 2; //pitch, roll, yaw
+
+//1 byte
+const REPORT_BUTTONS: u8 = 3; //0 == no buttons, 1 == left button, 2 == right button 3 == both buttons
+
+//1 byte
+const _REPORT_LED: u8 = 4; //0 == off, 1+ == on
 
 fn check_vjoy_enabled() -> Result<(), HidError> {
     let status = rusty_vjoy::vjoy_enabled();
@@ -113,7 +126,7 @@ fn acquire_vjoy_device(id: u32) -> Result<(), HidError> {
 
 fn find_space_navigator(api: &HidApi) -> HidResult<HidDevice> {
     for device_info in api.device_list() {
-        if device_info.vendor_id() == 1133 && device_info.product_id() == 50726 {
+        if device_info.vendor_id() == VENDOR_ID && device_info.product_id() == PRODUCT_ID {
             let dev = device_info.open_device(api)?;
             println!("SpaceNavigator device found");
             return Ok(dev);
@@ -122,6 +135,18 @@ fn find_space_navigator(api: &HidApi) -> HidResult<HidDevice> {
 
     println!("Could not find SpaceNavigator");
     Err(HidError::OpenHidDeviceError)
+}
+
+fn pause() {
+    let mut stdin = io::stdin();
+    let mut stdout = io::stdout();
+
+    // We want the cursor to stay at the end of the line, so we print without a newline and flush manually.
+    write!(stdout, "Press enter to exit...").unwrap();
+    stdout.flush().unwrap();
+
+    // Read a single byte and discard
+    let _ = stdin.read(&mut [0u8]).unwrap();
 }
 
 fn main() {
@@ -254,19 +279,4 @@ fn main() {
 
         rusty_vjoy::update_vjd(vjoy_id, &mut write_buffer);
     }
-}
-
-use std::io;
-use std::io::prelude::*;
-
-fn pause() {
-    let mut stdin = io::stdin();
-    let mut stdout = io::stdout();
-
-    // We want the cursor to stay at the end of the line, so we print without a newline and flush manually.
-    write!(stdout, "Press enter to exit...").unwrap();
-    stdout.flush().unwrap();
-
-    // Read a single byte and discard
-    let _ = stdin.read(&mut [0u8]).unwrap();
 }
